@@ -8,6 +8,9 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/things-go/go-socks5"
+	"github.com/things-go/go-socks5/statute"
 )
 
 // Traffic usage per client
@@ -94,26 +97,7 @@ func (tm *TrafficMeter) Accept() (net.Conn, error) {
 	}
 
 	addr := strings.Split(conn.RemoteAddr().String(), ":")[0]
-	if tm.traffic[addr].Read >= tm.userLimit ||
-		tm.traffic[addr].Write >= tm.userLimit {
-		msg := fmt.Sprintf("user %v exceeded the user limit of %v bytes", addr, tm.userLimit)
-		_, err := conn.Write([]byte(msg))
-		if err != nil {
-			log.Printf("[TrafficMeter] sending response to user err: %v", err)
-		}
-		log.Printf("[TrafficMeter] %v", msg)
-		return nil, fmt.Errorf(msg)
-	}
-
-	if tm.globalTrafficUsage >= tm.globalLimit {
-		msg := fmt.Sprintf("total traffic exceeded the global limit of %v bytes", tm.globalLimit)
-		_, err := conn.Write([]byte(msg))
-		if err != nil {
-			log.Printf("[TrafficMeter] sending response to user err: %v", err)
-		}
-		log.Printf("[TrafficMeter] %v", msg)
-		return nil, fmt.Errorf(msg)
-	}
+	// !!! we dont do checks here because return err here will crash server
 
 	// TODO according to the task we have to store "customer_id" but lets store just "customer ip" baceuse its affects nothing and add adding yet another mapper userID-userIP is trivial
 	// wrap the connection in a trackingConn
@@ -141,8 +125,29 @@ type trackingConn struct {
 	addr string
 }
 
+func (tc *trackingConn) checkThresholds() error {
+	if tc.tm.traffic[tc.addr].Read >= tc.tm.userLimit ||
+		tc.tm.traffic[tc.addr].Write >= tc.tm.userLimit {
+		if err := socks5.SendReply(tc.Conn, statute.RepRuleFailure, nil); err != nil {
+			log.Printf("[TrafficMeter] sending response to user err: %v", err)
+		}
+		return fmt.Errorf("user %v exceeded the user limit of %v bytes", tc.addr, tc.tm.userLimit)
+	}
+
+	if tc.tm.globalTrafficUsage >= tc.tm.globalLimit {
+		if err := socks5.SendReply(tc.Conn, statute.RepRuleFailure, nil); err != nil {
+			log.Printf("[TrafficMeter] sending response to user err: %v", err)
+		}
+		return fmt.Errorf("total traffic exceeded the global limit of %v bytes", tc.tm.globalLimit)
+	}
+	return nil
+}
+
 // override net.Conn.Read
 func (tc *trackingConn) Read(b []byte) (int, error) {
+	if err := tc.checkThresholds(); err != nil {
+		return 0, err
+	}
 	n, err := tc.Conn.Read(b)
 	if n > 0 {
 		tc.tm.mx.Lock()
