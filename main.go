@@ -20,8 +20,9 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
+	defer listener.Close()
+
 	w := NewTrafficMeter(listener)
-	w.SetUserLimit(500)
 	go w.RunLogging(mainCtx)
 
 	if err := server.Serve(w); err != nil {

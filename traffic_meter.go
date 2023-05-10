@@ -59,10 +59,14 @@ func (tc *TrafficMeter) GlobalTraffic() uint64 {
 }
 
 // Traffic returns the total traffic for the client by the client IP
-func (tm *TrafficMeter) Traffic(addr string) TrafficUsage {
+func (tm *TrafficMeter) Traffic(addr string) *TrafficUsage {
 	tm.mx.RLock()
 	defer tm.mx.RUnlock()
-	return tm.traffic[addr]
+	v, ok := tm.traffic[addr]
+	if !ok {
+		return nil
+	}
+	return &v
 }
 
 // LogUsage prints the total usage to the log
@@ -90,6 +94,7 @@ func (tm *TrafficMeter) RunLogging(ctx context.Context) {
 	}
 }
 
+// Accept - net.Listener overrided method
 func (tm *TrafficMeter) Accept() (net.Conn, error) {
 	conn, err := tm.l.Accept()
 	if err != nil {
@@ -110,10 +115,12 @@ func (tm *TrafficMeter) Accept() (net.Conn, error) {
 	return conn, nil
 }
 
+// Close - net.Listener overrided method
 func (tm *TrafficMeter) Close() error {
 	return tm.l.Close()
 }
 
+// Addr - net.Listener overrided method
 func (tm *TrafficMeter) Addr() net.Addr {
 	return tm.l.Addr()
 }
@@ -143,7 +150,7 @@ func (tc *trackingConn) checkThresholds() error {
 	return nil
 }
 
-// override net.Conn.Read
+// Read - overrided net.Conn
 func (tc *trackingConn) Read(b []byte) (int, error) {
 	if err := tc.checkThresholds(); err != nil {
 		return 0, err
@@ -166,7 +173,7 @@ func (tc *trackingConn) Read(b []byte) (int, error) {
 	return n, err
 }
 
-// override net.Conn.Write
+// Write - overrided net.Conn
 func (tc *trackingConn) Write(b []byte) (int, error) {
 	n, err := tc.Conn.Write(b)
 	if n > 0 {
