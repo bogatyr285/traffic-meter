@@ -43,14 +43,19 @@ func NewTrafficMeter(l net.Listener) *TrafficMeter {
 	return tm
 }
 
-// SetUserLimit - set bandwitdth limit for user
+// SetUserLimit - set traffic limit for user
 func (tm *TrafficMeter) SetUserLimit(s uint64) {
 	tm.userLimit = s
 }
 
-// SetGlobalLimit - set global bandwitdth limit
+// SetGlobalLimit - set global traffic limit
 func (tm *TrafficMeter) SetGlobalLimit(s uint64) {
 	tm.globalLimit = s
+}
+
+// SetLogPeriod - set log stats printing period
+func (tm *TrafficMeter) SetLogPeriod(t time.Duration) {
+	tm.logPeriod = t
 }
 
 // GlobalTraffic - returns the total traffic count

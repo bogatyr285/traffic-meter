@@ -23,6 +23,10 @@ func main() {
 	defer listener.Close()
 
 	w := NewTrafficMeter(listener)
+	// available configuration
+	// w.SetGlobalLimit(2 << (10 * 2))
+	// w.SetUserLimit(5 << (10 * 2))
+	// w.SetLogPeriod(time.Second * 15)
 	go w.RunLogging(mainCtx)
 
 	if err := server.Serve(w); err != nil {
